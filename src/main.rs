@@ -1,4 +1,13 @@
+use std::io;
+use std::io::prelude::*;
+use std::fs::File;
+
 use std::process::Command;
+use std::sync::{Arc, Mutex};
+use std::{thread,time,cmp};
+use std::sync::mpsc::channel;
+
+const zero: usize = 0;
 
 fn get_width() -> u16{
 	let columns = Command::new("tput").arg("cols").output().expect("failed to run tput");
@@ -12,30 +21,60 @@ fn get_width() -> u16{
 	}
 }
 
-fn print_progress_bar(value: usize, max: usize) {
-	let width = get_width() as usize;
+fn save_cursor_pos() {
+	Command::new("tput").arg("sc").output().expect("failed to run tput");
+}
+
+fn restore_cursor_pos() {
+	Command::new("tput").arg("rc").output().expect("failed to run tput");
+}
+
+fn print_progress_bar(value: usize, max: usize, width: usize) {
 	let inner_width: usize = if width > 3 { width - 2 } else { 78 };
 	let mut line = String::new();
 	line.push('[');
 
 	let label = format!("< {}% >", 100 * value / max);
-	let pos = value * inner_width / max;
+	let label_len = label.chars().count();
+	let pos = cmp::min(value * (inner_width - label_len) / max, inner_width - label_len);
 
 	for i in 1..pos {
 		line.push('-');
 	}
 	line.push_str(label.as_str());
-	let remaining = (inner_width as u16) - (pos as u16) - (label.chars().count() as u16);
+	let remaining = (inner_width as u16) - (pos as u16) - (label_len as u16);
 	for i in 1..remaining {
 		line.push('=');
 	}
 	line.push(']');
-	println!("written: {}", line.chars().count());
 	print!("{}", line);
+	std::io::stdout().flush().unwrap();
 }
 
 fn main() {
-	println!("Detected terminal width: {}", get_width());
-	print_progress_bar(50,100);
-	println!("");
+	let bytes_read = Arc::new(Mutex::new(zero));
+	let file = io::stdin();
+	let bytes_max: usize = 1024;
+
+	{
+		let bytes_read = bytes_read.clone();
+		thread::spawn(move || {
+			loop {
+				let bytes_read = *bytes_read.lock().unwrap();
+				if bytes_read >= bytes_max {break;}
+				save_cursor_pos();
+				print_progress_bar(bytes_read, bytes_max, get_width() as usize);
+				println!("");
+				restore_cursor_pos();
+				thread::sleep(time::Duration::from_millis(1000));
+			}
+		});
+	}
+
+	for b in file.bytes() {
+		*bytes_read.lock().unwrap() += 1;
+	}
+	*bytes_read.lock().unwrap() = bytes_max; // when not 100%, signal to thread "finished!"
+
+	println!("{} Bytes.", *bytes_read.lock().unwrap());
 }
