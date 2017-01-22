@@ -22,11 +22,11 @@ fn get_width() -> u16{
 }
 
 fn save_cursor_pos() {
-	Command::new("tput").arg("sc").output().expect("failed to run tput");
+	Command::new("tput").arg("sc").status().expect("failed to run tput");
 }
 
 fn restore_cursor_pos() {
-	Command::new("tput").arg("rc").output().expect("failed to run tput");
+	Command::new("tput").arg("rc").status().expect("failed to run tput");
 }
 
 fn print_progress_bar(value: usize, max: usize, width: usize) {
@@ -66,7 +66,8 @@ fn main() {
 				if *end_of_file.lock().unwrap() {break;}
 				save_cursor_pos();
 				print_progress_bar(bytes_read, bytes_max, get_width() as usize);
-				println!("");
+				std::io::stdout().flush().unwrap();
+				//println!("");
 				restore_cursor_pos();
 				thread::sleep(time::Duration::from_millis(1000));
 			}
