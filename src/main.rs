@@ -52,16 +52,18 @@ fn print_progress_bar(value: usize, max: usize, width: usize) {
 }
 
 fn main() {
-	let bytes_read = Arc::new(Mutex::new(zero));
+	let bytes_read  = Arc::new(Mutex::new(zero));
+	let end_of_file = Arc::new(Mutex::new(false));
 	let file = io::stdin();
 	let bytes_max: usize = 1024;
 
 	{
 		let bytes_read = bytes_read.clone();
+		let end_of_file = end_of_file.clone();
 		thread::spawn(move || {
 			loop {
 				let bytes_read = *bytes_read.lock().unwrap();
-				if bytes_read >= bytes_max {break;}
+				if *end_of_file.lock().unwrap() {break;}
 				save_cursor_pos();
 				print_progress_bar(bytes_read, bytes_max, get_width() as usize);
 				println!("");
@@ -74,7 +76,7 @@ fn main() {
 	for b in file.bytes() {
 		*bytes_read.lock().unwrap() += 1;
 	}
-	*bytes_read.lock().unwrap() = bytes_max; // when not 100%, signal to thread "finished!"
+	*end_of_file.lock().unwrap() = true; // signal to thread "finished!"
 
 	println!("{} Bytes.", *bytes_read.lock().unwrap());
 }
