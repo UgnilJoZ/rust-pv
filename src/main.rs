@@ -3,7 +3,7 @@ use std::io::prelude::*;
 use std::io::Write;
 use std::fs::File;
 
-use std::process::Command;
+use std::process::{Command,Stdio};
 use std::sync::{Arc, Mutex};
 use std::{thread,time,cmp};
 
@@ -22,11 +22,17 @@ fn get_width() -> u16{
 }
 
 fn save_cursor_pos() {
-	Command::new("tput").arg("sc").status().expect("failed to run tput");
+	let sequence = Command::new("tput").arg("sc").output()
+		.unwrap().stdout;
+	io::stderr().write(sequence.as_slice());
+	io::stderr().flush();
 }
 
 fn restore_cursor_pos() {
-	Command::new("tput").arg("rc").stdout(io::stderr()).status().expect("failed to run tput");
+	let sequence = Command::new("tput").arg("rc").output()
+		.unwrap().stdout;
+	io::stderr().write(sequence.as_slice());
+	io::stderr().flush();
 }
 
 fn print_progress_bar(value: usize, max: usize, width: usize) {
