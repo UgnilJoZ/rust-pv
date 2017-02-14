@@ -1,3 +1,5 @@
+extern crate getopts;
+
 use std::io;
 use std::io::prelude::*;
 use std::io::Write;
@@ -5,9 +7,16 @@ use std::fs::File;
 
 use std::process::{Command,Stdio};
 use std::sync::{Arc, Mutex};
-use std::{thread,time,cmp};
+use std::{thread,time,cmp,env,fs};
+
+use getopts::Options;
 
 const ZERO: usize = 0;
+
+fn print_usage(program: &str, opts: Options) {
+	let brief = format!("Usage: {} FILE [options]", program);
+	print!("{}", opts.usage(&brief));
+}
 
 fn get_width() -> u16{
 	let columns = Command::new("tput").arg("cols").output().expect("failed to run tput");
@@ -57,11 +66,38 @@ fn print_progress_bar(value: usize, max: usize, width: usize) {
 }
 
 fn main() {
+	// Command line options
+	let args: Vec<String> = env::args().collect();
+	let prog = args[0].clone();
+	let mut opts = Options::new();
+	opts.optopt("s", "size", "Expected ize of throughput in bytes (unnecessary when using -f)", "SIZE");
+	//opts.optopt("f", "file", "Input. When not given, stdin is used", "FILE");
+	let arguments = match opts.parse(&args[1..]) {
+		Ok(m) => { m }
+		Err(f) => { panic!(f.to_string()) }
+	};
+
+	// Thread communication / set up io and params
+	let mut file = io::stdin();
+
 	let bytes_read  = Arc::new(Mutex::new(ZERO));
 	let end_of_file = Arc::new(Mutex::new(false));
-	let file = io::stdin();
 	let mut output = io::stdout();
-	let bytes_max: usize = 1024;
+	let bytes_max: usize = {
+		if arguments.opt_present("s") {
+			arguments.opt_str("s").unwrap()
+				.parse::<usize>()
+				.unwrap()
+		} else 
+			{ 1 }
+	//} else {
+		//if arguments.opt_present("f") {
+		//	let metadata = try!(fs::metadata(arguments.opt_str("f").unwrap()));
+		//	bytes_max = metadata.len();
+		//}
+	};
+
+	// Actual start
 	save_cursor_pos();
 
 	{
@@ -73,7 +109,7 @@ fn main() {
 				if *end_of_file.lock().unwrap() {break;}
 				restore_cursor_pos();
 				print_progress_bar(bytes_read, bytes_max, get_width() as usize);
-				thread::sleep(time::Duration::from_millis(1000));
+				thread::sleep(time::Duration::from_millis(250));
 			}
 		});
 	}
@@ -84,5 +120,5 @@ fn main() {
 	}
 	*end_of_file.lock().unwrap() = true; // signal to thread "finished!"
 
-	println!("{} Bytes.", *bytes_read.lock().unwrap());
+	write!(io::stderr(), "\n{} Bytes.\n", *bytes_read.lock().unwrap());
 }
