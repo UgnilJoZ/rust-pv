@@ -120,5 +120,8 @@ fn main() {
 	}
 	*end_of_file.lock().unwrap() = true; // signal to thread "finished!"
 
+	restore_cursor_pos();
+	print_progress_bar(*bytes_read.lock().unwrap(), bytes_max, get_width() as usize);
+
 	write!(io::stderr(), "\n{} Bytes.\n", *bytes_read.lock().unwrap());
 }
