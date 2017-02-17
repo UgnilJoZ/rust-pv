@@ -2,7 +2,7 @@ extern crate getopts;
 
 use std::io;
 use std::io::prelude::*;
-use std::io::Write;
+use std::io::{BufReader,BufWriter};
 use std::fs::File;
 
 use std::process::{Command,Stdio};
@@ -79,10 +79,11 @@ fn main() {
 
 	// Thread communication / set up io and params
 	let mut file = io::stdin();
+	let mut file = BufReader::new(file);
 
 	let bytes_read  = Arc::new(Mutex::new(ZERO));
 	let end_of_file = Arc::new(Mutex::new(false));
-	let mut output = io::stdout();
+	let mut output = BufWriter::new(io::stdout());
 	let bytes_max: usize = {
 		if arguments.opt_present("s") {
 			arguments.opt_str("s").unwrap()
