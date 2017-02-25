@@ -65,6 +65,14 @@ fn print_progress_bar(value: usize, max: usize, width: usize) {
 	write!(io::stderr(), "{}", line).unwrap();
 }
 
+fn read_bytes<R: Read, W: Write>(file: &mut R, size: usize, output: &mut W, ref bytes_read: &std::sync::Arc<Mutex<usize>>, end_of_file: Arc<Mutex<bool>>) {
+	for b in file.bytes() {
+		output.write(&[b.unwrap()]).unwrap();
+		*bytes_read.lock().unwrap() += 1;
+	}
+	*end_of_file.lock().unwrap() = true; // signal to thread "finished!"
+}
+
 fn main() {
 	// Command line options
 	let args: Vec<String> = env::args().collect();
@@ -115,11 +123,7 @@ fn main() {
 		});
 	}
 
-	for b in file.bytes() {
-		output.write(&[b.unwrap()]).unwrap();
-		*bytes_read.lock().unwrap() += 1;
-	}
-	*end_of_file.lock().unwrap() = true; // signal to thread "finished!"
+	read_bytes(&mut file, bytes_max, &mut output, &bytes_read, end_of_file);
 
 	restore_cursor_pos();
 	print_progress_bar(*bytes_read.lock().unwrap(), bytes_max, get_width() as usize);
