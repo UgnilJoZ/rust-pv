@@ -14,7 +14,7 @@ use getopts::Options;
 const ZERO: usize = 0;
 
 fn print_usage(program: &str, opts: Options) {
-	let brief = format!("Usage: {} FILE [options]", program);
+	let brief = format!("Usage: {} [-f FILE] [-s SIZE]", program);
 	print!("{}", opts.usage(&brief));
 }
 
@@ -78,7 +78,7 @@ fn main() {
 	let args: Vec<String> = env::args().collect();
 	let prog = args[0].clone();
 	let mut opts = Options::new();
-	opts.optopt("s", "size", "Expected ize of throughput in bytes (unnecessary when using -f)", "SIZE");
+	opts.optopt("s", "size", "Expected size of throughput in bytes (unnecessary when using -f)", "SIZE");
 	opts.optopt("f", "file", "Input. When not given, stdin is used", "FILE");
 	opts.optflag("h", "help", "Prints Usage and exits");
 	let arguments = match opts.parse(&args[1..]) {
