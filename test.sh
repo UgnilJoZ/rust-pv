@@ -9,5 +9,8 @@ echo
 echo "Test 2: target/release/pv -f testfile > /dev/null"
 target/release/pv -f testfile > /dev/null
 echo
+echo "Test 3: (echo -e \"Hallo\nTschüs\" && sleep 1 && echo \"Söchen\" && sleep 1 && echo -e \"Hallo\nTschüs\") | target/release/pv -ls 5 > /dev/null"
+(echo -e "Hallo\nTschüs" && sleep 1 && echo "Söchen" && sleep 1 && echo -e "Hallo\nTschüs") | target/release/pv -ls 5 > /dev/null
+echo
 echo "Did this look good?"
 unlink testfile

@@ -73,6 +73,15 @@ fn read_bytes<R: Read, W: Write>(file: &mut R, size: usize, output: &mut W, ref 
 	*end_of_file.lock().unwrap() = true; // signal to thread "finished!"
 }
 
+fn read_lines<R: BufRead, W: Write>(file: &mut R, size: usize, output: &mut W, ref bytes_read: &std::sync::Arc<Mutex<usize>>, end_of_file: Arc<Mutex<bool>>) {
+	for b in file.lines() {
+		output.write_fmt(format_args!("{}\n", b.unwrap())).unwrap();
+		*bytes_read.lock().unwrap() += 1;
+	}
+	*end_of_file.lock().unwrap() = true; // signal to thread "finished!"
+	// Warning: if the input file doesn't end with '\n', one will be added.
+}
+
 fn main() {
 	// Command line options / Initialization
 	let args: Vec<String> = env::args().collect();
@@ -81,6 +90,7 @@ fn main() {
 	opts.optopt("s", "size", "Expected size of throughput in bytes (unnecessary when using -f)", "SIZE");
 	opts.optopt("f", "file", "Input. When not given, stdin is used", "FILE");
 	opts.optflag("h", "help", "Prints Usage and exits");
+	opts.optflag("l", "lines", "Uses line count insted of byte count. No automatic size detection, please use -s.");
 	let arguments = match opts.parse(&args[1..]) {
 		Ok(m) => { m }
 		Err(f) => { panic!(f.to_string()) }
@@ -94,7 +104,7 @@ fn main() {
 	let end_of_file = Arc::new(Mutex::new(false));
 	let mut output = BufWriter::new(io::stdout());
 	let bytes_max: usize = {
-		if arguments.opt_present("f") {
+		if arguments.opt_present("f") && !arguments.opt_present("l") {
 			let filename = arguments.opt_str("f").unwrap();
 			let mut f = File::open(filename).unwrap();
 			let metadata = f.metadata().unwrap();
@@ -108,7 +118,7 @@ fn main() {
 		}
 	};
 
-	// Actual start
+	// Initialization complete
 	save_cursor_pos();
 
 	// T H R E A D
@@ -131,15 +141,22 @@ fn main() {
 		let filename = arguments.opt_str("f").unwrap();
 		let mut file = File::open(filename).unwrap();
 		let mut file = BufReader::new(file);
-		read_bytes(&mut file, bytes_max, &mut output, &bytes_read, end_of_file);
+		if arguments.opt_present("l") 
+			{ read_lines(&mut file, bytes_max, &mut output, &bytes_read, end_of_file); }
+		else
+			{ read_bytes(&mut file, bytes_max, &mut output, &bytes_read, end_of_file); }
 	} else {
 		let mut file = io::stdin();
 		let mut file = BufReader::new(file);
-		read_bytes(&mut file, bytes_max, &mut output, &bytes_read, end_of_file);
+		if arguments.opt_present("l")
+			{ read_lines(&mut file, bytes_max, &mut output, &bytes_read, end_of_file); }
+		else
+			{ read_bytes(&mut file, bytes_max, &mut output, &bytes_read, end_of_file); }
 	}
 
 	restore_cursor_pos();
 	print_progress_bar(*bytes_read.lock().unwrap(), bytes_max, get_width() as usize);
 
-	write!(io::stderr(), "\n{} Bytes.\n", *bytes_read.lock().unwrap());
+	let unit = if arguments.opt_present("l") { "Lines" } else { "Bytes" };
+	write!(io::stderr(), "\n{} {}.\n", *bytes_read.lock().unwrap(), unit);
 }
